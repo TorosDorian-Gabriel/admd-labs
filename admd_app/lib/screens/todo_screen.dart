@@ -1,13 +1,6 @@
 import 'package:flutter/material.dart';
-
-class Todo {
-  final String id;
-  String title;
-  bool done;
-
-  Todo(this.title, {this.done = false, String? id})
-      : id = id ?? UniqueKey().toString();
-}
+import '../models/todo.dart';
+import '../api/todo_api.dart';
 
 class TodoScreen extends StatefulWidget {
   const TodoScreen({super.key});
@@ -16,29 +9,60 @@ class TodoScreen extends StatefulWidget {
   State<TodoScreen> createState() => _TodoState();
 }
 
-class _TodoState 
-      extends State<TodoScreen> {
-  final _items = <Todo>[];
+class _TodoState extends State<TodoScreen> {
+  List<Todo> _items = [];
   final _input = TextEditingController();
+  bool _isLoading = true;
+  String _retryLog = '';
+
+  @override
+  void initState() {
+    super.initState();
+    const a = Todo(userId: 1, id: 1, title: 'todo', completed: false);
+    const b = Todo(userId: 1, id: 1, title: 'todo', completed: false);
+    print('Equality test a == b: ${a == b}');
+    _loadApiTodos();
+  }
+
+  Future<void> _loadApiTodos() async {
+    try {
+      final fetchedTodos = await fetchTodos();
+      setState(() {
+        _items = fetchedTodos;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _retryLog = 'Failed after retries: $e';
+      });
+    }
+  }
+
   void _add() {
     setState(() {
-      _items.add(Todo(_input.text));
+      _items.add(Todo(
+        userId: 1,
+        id: _items.length + 1,
+        title: _input.text,
+        completed: false,
+      ));
     });
     _input.clear();
   }
-  void _bug1() {
-  int done = 0;
-  for (var i = 0; i < _items.length; i++) {
-    done += _items[i].done ? 1 : 0;
+
+  void _toggle(int index) {
+    setState(() {
+      final current = _items[index];
+      _items[index] = Todo(
+        userId: current.userId,
+        id: current.id,
+        title: current.title,
+        completed: !current.completed,
+      );
+    });
   }
-}
-void _bug3() {
-  String? _filter;
-  final visible = _items.where(
-    (t) => t.title.contains(_filter ?? ''),);
-}
-void _toggle(int i) =>
-  setState(() {_items[i].done = !_items[i].done;});
+
   @override
   void dispose() {
     _input.dispose();
@@ -52,34 +76,50 @@ void _toggle(int i) =>
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: const Text('Todo List'),
       ),
-      body: ListView.builder(
-        itemCount: _items.length,
-        itemBuilder: (context, index) {
-          final todo = _items[index];
-          return Dismissible(
-            key: ValueKey(todo.id),
-            direction: DismissDirection.endToStart,
-            onDismissed: (_) => setState(() {
-              _items.removeWhere((t) => t.id == todo.id);
-            }),
-            background: Container(color: Colors.red),
-            child: TodoTile(
-              todo: todo,
-              onChanged: (val) {
-                // setState(() {
-                //   todo.done = val ?? false;
-                // }
-                // );
-                _toggle(index);
-              },
+      body: Column(
+        children: [
+          if (_retryLog.isNotEmpty)
+            Container(
+              color: Colors.red.shade100,
+              padding: const EdgeInsets.all(8.0),
+              width: double.infinity,
+              child: Text(
+                _retryLog,
+                style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
+              ),
             ),
-          );
-        },
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : ListView.builder(
+                    itemCount: _items.length,
+                    itemBuilder: (context, index) {
+                      final todo = _items[index];
+                      return Dismissible(
+                        key: ValueKey(todo.id),
+                        direction: DismissDirection.endToStart,
+                        onDismissed: (_) => setState(() {
+                          _items.removeAt(index);
+                        }),
+                        background: Container(color: Colors.red),
+                        child: Card(
+                          margin: const EdgeInsets.all(8.0),
+                          child: ListTile(
+                            title: Text(todo.title),
+                            trailing: Checkbox(
+                              value: todo.completed,
+                              onChanged: (_) => _toggle(index),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          _bug1();
-          _bug3();
           showDialog(
             context: context,
             builder: (context) => AlertDialog(
@@ -108,31 +148,6 @@ void _toggle(int i) =>
           );
         },
         child: const Icon(Icons.add),
-      ),
-    );
-  }
-}
-
-class TodoTile extends StatelessWidget {
-  const TodoTile({
-    super.key,
-    required this.todo,
-    required this.onChanged,
-  });
-
-  final Todo todo;
-  final ValueChanged<bool?> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.all(8.0),
-      child: ListTile(
-        title: Text(todo.title),
-        trailing: Checkbox(
-          value: todo.done,
-          onChanged: onChanged,
-        ),
       ),
     );
   }
