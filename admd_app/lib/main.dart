@@ -1,8 +1,19 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:admd_app/screens/todo_screen.dart';
+import 'package:admd_app/todos/bloc/todo_bloc.dart';
+import 'package:admd_app/todos/bloc/todo_event.dart';
+import 'package:admd_app/todos/todo_repository.dart';
 
 void main() {
-  runApp(const MyApp());
+  final repo = TodoRepository(Dio());
+  runApp(
+    BlocProvider(
+      create: (_) => TodoBloc(repo)..add(LoadTodos()),
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
